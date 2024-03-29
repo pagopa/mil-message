@@ -1,0 +1,302 @@
+openapi: 3.0.3
+
+info:
+  title: Message Microservice
+  version: 2.0.0
+  description: Message Microservice of Multi-channel Integration Layer of SW Client Project
+  contact:
+    name: Antonio Tarricone
+    email: antonio.tarricone@pagopa.it
+
+servers:
+  - description: Development Test
+    url: https://mil-d-apim.azure-api.net/mil-message/v1
+    x-internal: true
+  - description: User Acceptance Test
+    url: https://mil-u-apim.azure-api.net/mil-message/v1
+    x-internal: true
+
+tags:
+  - name: pull
+    description: To pull a message
+
+security:
+  - BearerAuth: [ ]
+
+paths:
+  /messages/retrieve:
+    post:
+      operationId: getMessage
+      description: Returns messages for the user identified by the claim 'userCodeToken' of the access token and marks them as delivered
+      tags: [ pull ]
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        "200":
+          #description: Ok
+          $ref: '#/components/responses/Messages'
+        "400":
+          #description: Bad request
+          $ref: '#/components/responses/Error'
+        "401":
+          #description: Wrong credentials
+          $ref: '#/components/responses/Error'
+        "403":
+          #description: Forbidden
+          $ref: '#/components/responses/Error'
+        "406":
+          #description: Not acceptable. Did you require application/json?
+          $ref: '#/components/responses/Error'
+        "429":
+          #description: Too many request
+          $ref: '#/components/responses/Error'
+        "500":
+          #description: Server error
+          $ref: '#/components/responses/Error'
+        default:
+          #description: Unexpected error
+          $ref: '#/components/responses/Error'
+
+components:
+  # ----------------------------------------------------------------------------------
+  # Schemas
+  # ----------------------------------------------------------------------------------
+  schemas:
+    # --------------------------------------------------------------------------------
+    # Basic types
+    # --------------------------------------------------------------------------------
+    AccessControlAllowOrigin:
+      description: Indicates whether the response can be shared with requesting code from the given origin
+      type: string
+      pattern: "^[ -~]{1,2048}$"
+      minLength: 1
+      maxLength: 2048
+      example: "https://mil-d-apim.azure-api.net/portal"
+
+    Body:
+      description: Body of the message
+      type: string
+      pattern: "^[\\u0001-\\uD7FF\\uE000-\\uFFFD\\U10000-\\U10FFFF]{80,10000}$"
+      minLength: 80
+      maxLength: 10000
+      example: "This is a message from your public administration to notify you that your monthly contributions have been paid."
+
+    ErrorCode:
+      description: Error code
+      type: string
+      pattern: "^[A-F0-9]{9}$"
+      minLength: 9
+      maxLength: 9
+      example: "001000005"
+
+    ErrorDescription:
+      description: Error description
+      type: string
+      pattern: "^[ -~]{1,256}$"
+      minLength: 1
+      maxLength: 256
+      example: "Unexpected error from server"
+
+    RateLimitLimit:
+      description: The number of allowed requests in the current period
+      type: integer
+      format: int32
+      minimum: 1
+      maximum: 240
+      example: 2
+
+    RateLimitReset:
+      description: The number of seconds left in the current period
+      type: integer
+      format: int32
+      minimum: 1
+      maximum: 60
+      example: 30
+
+    RetryAfter:
+      description: The number of seconds to wait before allowing a follow-up request
+      type: integer
+      format: int32
+      minimum: 1
+      maximum: 240
+      example: 60
+
+    RequestId:
+      description: Request ID that will be logged by service
+      type: string
+      pattern: "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
+      minLength: 36
+      maxLength: 36
+      example: "d0d654e6-97da-4848-b568-99fedccb642b"
+
+    Subject:
+      description: Subject of the message
+      type: string
+      pattern: "^[\\u0001-\\uD7FF\\uE000-\\uFFFD\\U10000-\\U10FFFF]{10,120}$"
+      minLength: 10
+      maxLength: 120
+      example: "Monthly contributions"
+
+    Timestamp:
+      description: Timestamp of the message (ex. 2024-03-06T13:15:54Z, 2024-03-06T14:15:54+01:00)
+      type: string
+      format: date-time
+      pattern: "^\\d{4}\\-\\d{2}\\-\\d{2}T\\d{2}:\\d{2}:\\d{2}(Z|(\\+|\\-)\\d{2}:\\d{2})$"
+      minLength: 20
+      maxLength: 25
+      example: "2024-03-06T14:15:54+01:00"
+
+    # --------------------------------------------------------------------------------
+    # Complex types
+    # --------------------------------------------------------------------------------
+    Error:
+      description: Error details
+      type: object
+      additionalProperties: false
+      properties:
+        errorCode:
+          $ref: '#/components/schemas/ErrorCode'
+        errorDescription:
+          $ref: '#/components/schemas/ErrorDescription'
+      required:
+        - errorCode
+        - errorDescription
+      example:
+        errorCode: "001000001"
+        errorDescription: "Generic error"
+
+    Errors:
+      description: Errors list
+      type: object
+      additionalProperties: false
+      properties:
+        errors:
+          type: array
+          minItems: 1
+          maxItems: 32
+          items:
+            $ref: '#/components/schemas/Error'
+      required:
+        - errors
+      example:
+        errors:
+          - errorCode: "00000000A"
+            errorDescription: "Generic error"
+          - errorCode: "001000001"
+            errorDescription: "Unexpected error from server"
+
+    Message:
+      description: Message to deliver
+      type: object
+      additionalProperties: false
+      properties:
+        subject:
+          $ref: '#/components/schemas/Subject'
+        body:
+          $ref: '#/components/schemas/Body'
+        timestamp:
+          $ref: '#/components/schemas/Timestamp'
+      required:
+        - subject
+        - body
+        - timestamp
+      example:
+        subject: "Monthly contributions"
+        body: "This is a message from your public administration to notify you that your monthly contributions have been paid."
+        timestamp: "2024-03-06T14:15:54+01:00"
+
+    Messages:
+      description: List of messages
+      type: object
+      additionalProperties: false
+      properties:
+        messages:
+          type: array
+          minItems: 0
+          maxItems: 32
+          items:
+            $ref: '#/components/schemas/Message'
+      required:
+        - messages
+      example:
+        messages:
+          - subject: "Monthly contributions"
+            body: "This is a message from your public administration to notify you that your monthly contributions have been paid."
+            timestamp: "2024-03-06T14:15:54+01:00"
+
+  # ----------------------------------------------------------------------------------
+  # Parameters
+  # ----------------------------------------------------------------------------------
+  parameters:
+    RequestId:
+      name: RequestId
+      in: header
+      description: Request ID that will be logged by service
+      required: true
+      schema:
+        $ref: '#/components/schemas/RequestId'
+
+  # ----------------------------------------------------------------------------------
+  # Responses
+  # ----------------------------------------------------------------------------------
+  responses:
+    Messages:
+      description: Response to the request to get messages
+      headers:
+        Access-Control-Allow-Origin:
+          description: Indicates whether the response can be shared with requesting code from the given origin
+          required: false
+          schema:
+            $ref: '#/components/schemas/AccessControlAllowOrigin'
+        RateLimit-Limit:
+          description: The number of allowed requests in the current period
+          required: false
+          schema:
+            $ref: '#/components/schemas/RateLimitLimit'
+        RateLimit-Reset:
+          description: The number of seconds left in the current period
+          required: false
+          schema:
+            $ref: '#/components/schemas/RateLimitReset'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Messages'
+
+    Error:
+      description: Error response
+      headers:
+        Access-Control-Allow-Origin:
+          description: Indicates whether the response can be shared with requesting code from the given origin
+          required: false
+          schema:
+            $ref: '#/components/schemas/AccessControlAllowOrigin'
+        RateLimit-Limit:
+          description: The number of allowed requests in the current period
+          required: false
+          schema:
+            $ref: '#/components/schemas/RateLimitLimit'
+        RateLimit-Reset:
+          description: The number of seconds left in the current period
+          required: false
+          schema:
+            $ref: '#/components/schemas/RateLimitReset'
+        Retry-After:
+          description: The number of seconds to wait before allowing a follow-up request
+          required: false
+          schema:
+            $ref: '#/components/schemas/RetryAfter'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Errors'
+
+  # ----------------------------------------------------------------------------------
+  # Security schemes
+  # ----------------------------------------------------------------------------------
+  securitySchemes:
+    BearerAuth:
+      description: A bearer token in the format of a JWS and conforms to the specifications included in RFC8725
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
